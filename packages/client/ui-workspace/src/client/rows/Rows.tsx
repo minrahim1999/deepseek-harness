@@ -345,12 +345,16 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.onRename - open the session rename dialog (id + current title).
  * @param props.onFork - fork a session at its last completed turn.
  * @param props.onArchive - archive a session by id.
+ * @param props.onDelete - delete a session by id (destructive; the browser owns the confirmation dialog).
  * @param props.drag - optional draggable-row wiring.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({
+  node, currentId, now, onOpen, onRename, onFork, onArchive, onDelete,
+  bulkSelected, onToggleSelected, drag, flat = false, t,
+}: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -361,6 +365,12 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
   onArchive: (id: SessionNode['id']) => void
+  /** Delete this session (row menu action; the browser owns the confirmation dialog). */
+  onDelete: (id: SessionNode['id']) => void
+  /** Whether this session is selected for bulk delete. */
+  bulkSelected?: boolean
+  /** Toggle this session's bulk-delete selection. */
+  onToggleSelected?: (id: SessionNode['id']) => void
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -382,6 +392,9 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
     { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
     { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
+    // Destructive: styled with the danger color and confirmed by the browser
+    // dialog before the session log is removed.
+    { id: 'delete', label: t('menu.deleteSession'), icon: <IconTrashOutline16 />, danger: true },
   ]
   // Figma session cell: pad 8, status slot 16, then a 4px title gap.
   const ownRow = (
@@ -427,6 +440,18 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           {showStatus && <SessionStatusDots statuses={statuses} />}
         </span>
       )}
+      {onToggleSelected !== undefined && (
+        <span className={css.slot}>
+          <input
+            type="checkbox"
+            className={css.bulkSelect}
+            checked={bulkSelected === true}
+            aria-label={t('actions.session.select', { name: title })}
+            onClick={(e) => { e.stopPropagation() }}
+            onChange={() => { onToggleSelected(node.id) }}
+          />
+        </span>
+      )}
       <span className={css.title}>{title}</span>
       {/* A blank New Session row is a provisional placeholder: nothing has
           happened in it yet, so a "now" timestamp and the row verbs
@@ -444,6 +469,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
               if (id === 'rename') onRename(node.id, row.title)
               if (id === 'fork') onFork(node.id)
               if (id === 'archive') onArchive(node.id)
+              if (id === 'delete') onDelete(node.id)
             }}
             portal
             closeOnPointerLeave

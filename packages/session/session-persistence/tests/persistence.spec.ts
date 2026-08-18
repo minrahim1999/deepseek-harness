@@ -173,6 +173,11 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
       revision: memoryRevision(entry),
     }))
   }
+
+  async delete(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    return this.store.delete(id)
+  }
 }
 
 /** Controllable storage primitive for serialization and retirement failure tests. */

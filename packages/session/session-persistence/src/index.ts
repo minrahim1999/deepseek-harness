@@ -228,6 +228,18 @@ export abstract class SessionPersistence extends Service {
   abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
   /**
+   * Permanently delete a persisted session and all of its durable artifacts.
+   * The session must not be live (attached to a running Agent); callers
+   * detach it from the SessionStore first. Deleting an absent session is a
+   * no-op success. Implementations remove the session's backend-owned
+   * artifacts (JSONL log directory, SQLite rows) and any derived caches.
+   * @param id - the persisted session to delete.
+   * @param signal - optional cancellation for backend delete work.
+   * @returns whether a materialized session was actually removed.
+   */
+  abstract delete(id: SessionId, signal?: AbortSignal): Promise<boolean>
+
+  /**
    * List materialized sessions with cheap per-log change tokens.
    *
    * Repeated observations of an unchanged log return the same revision. A

@@ -603,6 +603,23 @@ export class SessionManager {
   }
 
   /**
+   * Permanently delete a session and its durable log. On success the session
+   * is removed from the local list store immediately (without waiting for the
+   * Host frame).
+   * @param sessionId - the session to delete.
+   * @returns the wire result.
+   */
+  async delete(sessionId: SessionId): Promise<RpcResult<{ deleted: true }>> {
+    try {
+      const { result } = await this.api.sessions.delete({ sessionId })
+      if (result.ok) this.recordMutation({ kind: 'remove', sessionId })
+      return result
+    } catch (error) {
+      return transportError(error)
+    }
+  }
+
+  /**
    * Insert-or-enrich a locally synthesized summary: a new id prepends; an
    * existing entry only gains fields it lacks (the session-added frame and the
    * create() echo race — whichever lands second must fill the placeholder's

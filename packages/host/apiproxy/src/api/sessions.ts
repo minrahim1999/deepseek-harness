@@ -313,6 +313,15 @@ export interface SessionsApi {
   Promise<RpcResponse<{ title: string; seq: number }>>
 
   /**
+   * Permanently deletes a session and its durable log. The session must not
+   * be running; a live session fails with `session-busy`. The session is
+   * detached from its workspace accounting and removed from session
+   * persistence. Deleting an absent session is a no-op success.
+   */
+  delete(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ deleted: true }>>
+
+  /**
    * Sends a message. content is core's ContentBlock[] verbatim; mode maps 1:1 — queue→send, steer→steer.
    * A prompt whose content is exactly one text block starting with '/' is a slash command: the host
    * executes it through the command registry (mode-agnostic) and it is never sent to the model. A

@@ -469,6 +469,30 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return snapshots
   }
 
+  /**
+   * Permanently delete a persisted session and its JSONL log directory.
+   * Locates the session's log across project directories (rejecting a
+   * duplicate id), then removes the whole per-session directory. Deleting an
+   * absent session is a no-op success. The caller must have detached the
+   * session from the live SessionStore first.
+   * @param id - the persisted session to delete.
+   * @param signal - optional cancellation for backend delete work.
+   * @returns whether a materialized session was actually removed.
+   */
+  override async delete(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    await this.ensureRootEncoding()
+    signal?.throwIfAborted()
+    const log = await this.findLog(id, signal)
+    if (log === undefined) return false
+    signal?.throwIfAborted()
+    // Remove the whole per-session directory (the log plus any session-local
+    // artifacts). rm with force:true and recursive:true is idempotent.
+    await rm(dirname(log), { recursive: true, force: true })
+    signal?.throwIfAborted()
+    return true
+  }
+
   private async listArtifacts(signal?: AbortSignal): Promise<Array<{ header: SessionHeader; path: string }>> {
     signal?.throwIfAborted()
     await this.ensureRootEncoding()

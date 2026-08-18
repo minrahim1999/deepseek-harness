@@ -341,6 +341,15 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Bulk-delete selection checkbox: compact, aligned to the status slot. */
+.bulkSelect {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
 /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
    darker (tertiary, #81858C) per the cell spec. */
 .chevron {

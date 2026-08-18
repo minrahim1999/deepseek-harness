@@ -532,6 +532,19 @@ export class SessionRuntime implements ISessions {
   }
 
   /**
+   * Permanently delete a session and its durable log. The session must not
+   * be running; a live session fails with `session-busy`. On resolution the
+   * session is removed from the list store and its workspace accounting.
+   * @param sessionId - the session to delete.
+   * @returns the wire result.
+   */
+  async delete(sessionId: SessionId): Promise<RpcResult<{ deleted: true }>> {
+    const result = await this.manager.delete(sessionId)
+    if (result.ok) this.projectList()
+    return result
+  }
+
+  /**
    * Resolve an Agent-scoped context view (use-and-discard).
    * @param id - session id (the agent identity — 1:1 same axis).
    * @returns scoped ctx, or undefined for a session neither listed nor already scoped.

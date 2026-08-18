@@ -96,6 +96,14 @@ export interface ISessions {
    */
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>
   /**
+   * Permanently delete a session and its durable log. The session must not
+   * be running; a live session fails with `session-busy`. On resolution the
+   * session is removed from the list store and its workspace accounting.
+   * @param sessionId - the session to delete.
+   * @returns the wire result.
+   */
+  delete(sessionId: SessionId): Promise<RpcResult<{ deleted: true }>>
+  /**
    * Register a per-session standard-props provider (hooks become `use<Name>`
    * selector hooks on the render side; props spread verbatim).
    * @param descriptor - static member roster plus per-session resolver.

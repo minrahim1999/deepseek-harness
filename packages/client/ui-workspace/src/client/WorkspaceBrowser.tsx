@@ -241,6 +241,12 @@ type SessionTreeProps = Pick<
   onSessionRename: (sessionId: SessionNode['id'], currentTitle: string) => void
   /** Archive a session (row menu action; the row disappears on the state echo). */
   onSessionArchive: (sessionId: SessionNode['id']) => void
+  /** Delete a session (row menu action; the browser owns the confirmation dialog). */
+  onSessionDelete: (sessionId: SessionNode['id']) => void
+  /** Session ids selected for bulk delete. */
+  selectedSessionIds: readonly string[]
+  /** Toggle one session's bulk-delete selection. */
+  onToggleSessionSelected: (sessionId: SessionNode['id']) => void
   /** Session order behavior: fixed after edits, or additionally promoted by user activity. */
   orderBy: SessionOrderBy
 }
@@ -248,7 +254,7 @@ type SessionTreeProps = Pick<
 /** The scrolling session tree; unmounting drops the sessions subscription and expand-all state. */
 function SessionTree({
   useSessions, startSession, open, forkSession, workspaces, archivedSessionIds,
-  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
+  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive, onSessionDelete,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
@@ -516,6 +522,7 @@ function SessionTree({
                     onRename={onSessionRename}
                     onFork={forkSession}
                     onArchive={onSessionArchive}
+                    onDelete={onSessionDelete}
                     drag={dragProps}
                     t={t}
                   />
@@ -544,7 +551,8 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  useSessions, open, forkSession, onSessionRename, onSessionArchive, archivedSessionIds,
+  useSessions, open, forkSession, onSessionRename, onSessionArchive, onSessionDelete,
+  selectedSessionIds, onToggleSessionSelected, archivedSessionIds,
   orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
 }: Pick<
   SessionTreeProps,
@@ -553,6 +561,9 @@ function FlatList({
   | 'forkSession'
   | 'onSessionRename'
   | 'onSessionArchive'
+  | 'onSessionDelete'
+  | 'selectedSessionIds'
+  | 'onToggleSessionSelected'
   | 'archivedSessionIds'
   | 'orderBy'
   | 'sessionOrderByAccount'
@@ -632,6 +643,9 @@ function FlatList({
               onRename={onSessionRename}
               onFork={forkSession}
               onArchive={onSessionArchive}
+              onDelete={onSessionDelete}
+              bulkSelected={selectedSessionIds.includes(node.id)}
+              onToggleSelected={onToggleSessionSelected}
               flat
               drag={{
                 start: () => {
@@ -753,6 +767,7 @@ export function WorkspaceBrowser({
   deleteWorkspace,
   insertWorkspaceBefore,
   archiveSession,
+  deleteSession,
   insertSessionBefore,
   createWorkspace,
   searchSessions,
@@ -934,6 +949,72 @@ export function WorkspaceBrowser({
   const onSessionArchive = (sessionId: SessionNode['id']) => {
     archiveSession(sessionId).catch((reason: unknown) => {
       console.warn('session archive rejected:', reason)
+    })
+  }
+
+  // Bulk-delete selection: the store's selectedSessionIds drives the row
+  // checkboxes; toggling is a pure store action.
+  const selectedSessionIds = useStore(state => state.selectedSessionIds)
+  const onToggleSessionSelected = (sessionId: SessionNode['id']) => {
+    actions.toggleSessionSelected(sessionId)
+  }
+
+  // Delete is destructive: the browser owns a confirmation dialog before the
+  // session log is removed. The dialog is separate from the row so a
+  // successful removal can unmount that row without tearing down the
+  // in-flight confirmation state.
+  const [sessionDeleteTarget, setSessionDeleteTarget] = useState<SessionNode['id'] | null>(null)
+  const [sessionDeleting, setSessionDeleting] = useState(false)
+  const [sessionDeleteError, setSessionDeleteError] = useState<string | null>(null)
+  const onSessionDelete = (sessionId: SessionNode['id']) => {
+    setSessionDeleteTarget(sessionId)
+    setSessionDeleteError(null)
+  }
+  const closeSessionDelete = () => {
+    if (sessionDeleting) return
+    setSessionDeleteTarget(null)
+    setSessionDeleteError(null)
+  }
+  const confirmSessionDelete = () => {
+    if (sessionDeleting || sessionDeleteTarget === null) return
+    setSessionDeleting(true)
+    setSessionDeleteError(null)
+    deleteSession(sessionDeleteTarget).then(() => {
+      setSessionDeleting(false)
+      setSessionDeleteTarget(null)
+    }).catch((reason: unknown) => {
+      setSessionDeleting(false)
+      setSessionDeleteError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }
+
+  // Bulk delete: confirm once, then delete every selected session. The
+  // selection is cleared on success (and on cancel) so the bar disappears.
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
+  const openBulkDelete = () => {
+    if (selectedSessionIds.length === 0) return
+    setBulkDeleteOpen(true)
+    setBulkDeleteError(null)
+  }
+  const closeBulkDelete = () => {
+    if (bulkDeleting) return
+    setBulkDeleteOpen(false)
+    setBulkDeleteError(null)
+  }
+  const confirmBulkDelete = () => {
+    if (bulkDeleting || selectedSessionIds.length === 0) return
+    setBulkDeleting(true)
+    setBulkDeleteError(null)
+    const targets = [...selectedSessionIds] as SessionNode['id'][]
+    Promise.all(targets.map(id => deleteSession(id))).then(() => {
+      setBulkDeleting(false)
+      setBulkDeleteOpen(false)
+      actions.clearSessionSelection()
+    }).catch((reason: unknown) => {
+      setBulkDeleting(false)
+      setBulkDeleteError(reason instanceof Error ? reason.message : String(reason))
     })
   }
 
@@ -1124,6 +1205,9 @@ export function WorkspaceBrowser({
               <FlatList
                 useSessions={useSessions} open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
+                onSessionDelete={onSessionDelete}
+                selectedSessionIds={selectedSessionIds}
+                onToggleSessionSelected={onToggleSessionSelected}
                 archivedSessionIds={archivedSessionIds}
                 orderBy={orderBy}
                 sessionOrderByAccount={sessionOrderByAccount}
@@ -1138,6 +1222,9 @@ export function WorkspaceBrowser({
                 useSessions={useSessions}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
+                onSessionDelete={onSessionDelete}
+                selectedSessionIds={selectedSessionIds}
+                onToggleSessionSelected={onToggleSessionSelected}
                 forkSession={forkSession}
                 workspaces={workspaces}
                 groupExpansion={groupExpansion}
@@ -1165,6 +1252,29 @@ export function WorkspaceBrowser({
               />
             ))}
       </div>
+
+      {/* Bulk-delete action bar: appears when one or more sessions are
+          selected via the row checkboxes. */}
+      {selectedSessionIds.length > 0 && (
+        <div className={css.bulkBar}>
+          <span className={css.bulkCount}>
+            {t('bulk.selected', { n: selectedSessionIds.length })}
+          </span>
+          <Button
+            variant="outline"
+            className={css.deleteAction}
+            onClick={openBulkDelete}
+          >
+            {t('bulk.delete')}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { actions.clearSessionSelection() }}
+          >
+            {t('cancel')}
+          </Button>
+        </div>
+      )}
 
       <Modal
         open={renameTarget !== null}
@@ -1256,6 +1366,52 @@ export function WorkspaceBrowser({
       >
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
+      </Modal>
+      <Modal
+        open={sessionDeleteTarget !== null}
+        onClose={closeSessionDelete}
+        closeLabel={t('close')}
+        title={t('delete.session')}
+        description={t('delete.session.desc')}
+        footer={(
+          <>
+            <Button variant="outline" disabled={sessionDeleting} onClick={closeSessionDelete}>{t('cancel')}</Button>
+            <Button
+              variant="outline"
+              className={css.deleteAction}
+              disabled={sessionDeleting}
+              onClick={confirmSessionDelete}
+            >
+              {t('delete.session')}
+            </Button>
+          </>
+        )}
+      >
+        {sessionDeleting && <div className={css.deleteStatus} role="status">{t('delete.session.pending')}</div>}
+        {sessionDeleteError !== null && <div className={css.renameError} role="alert">{sessionDeleteError}</div>}
+      </Modal>
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={closeBulkDelete}
+        closeLabel={t('close')}
+        title={t('bulk.delete')}
+        description={t('bulk.delete.desc', { n: selectedSessionIds.length })}
+        footer={(
+          <>
+            <Button variant="outline" disabled={bulkDeleting} onClick={closeBulkDelete}>{t('cancel')}</Button>
+            <Button
+              variant="outline"
+              className={css.deleteAction}
+              disabled={bulkDeleting}
+              onClick={confirmBulkDelete}
+            >
+              {t('bulk.delete')}
+            </Button>
+          </>
+        )}
+      >
+        {bulkDeleting && <div className={css.deleteStatus} role="status">{t('bulk.delete.pending')}</div>}
+        {bulkDeleteError !== null && <div className={css.renameError} role="alert">{bulkDeleteError}</div>}
       </Modal>
     </div>
   )

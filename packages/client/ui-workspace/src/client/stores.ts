@@ -25,6 +25,8 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Last observed update timestamps per order account for one-time promotion events. */
   sessionUpdatedAtByAccount: Record<string, Record<string, number>>
+  /** Session ids selected for bulk delete (transient; cleared on delete/remount). */
+  selectedSessionIds: string[]
 }
 
 /**
@@ -43,6 +45,9 @@ type WorkspaceViewActions = {
     updatedAt: Record<string, number>,
   ) => void
   setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
+  toggleSessionSelected: (draft: WorkspaceViewState, sessionId: string) => void
+  setSessionsSelected: (draft: WorkspaceViewState, sessionIds: readonly string[]) => void
+  clearSessionSelection: (draft: WorkspaceViewState) => void
 }
 
 /**
@@ -57,6 +62,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       groupExpansion: {},
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
+      selectedSessionIds: [],
     }),
     persist: 'dsh.workspace.view.v5',
     actions: {
@@ -81,6 +87,17 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       },
       setSessionOrder: (d, accountKey: string, order: string[]) => {
         d.sessionOrderByAccount[accountKey] = order
+      },
+      toggleSessionSelected: (d, sessionId: string) => {
+        d.selectedSessionIds = d.selectedSessionIds.includes(sessionId)
+          ? d.selectedSessionIds.filter(id => id !== sessionId)
+          : [...d.selectedSessionIds, sessionId]
+      },
+      setSessionsSelected: (d, sessionIds: readonly string[]) => {
+        d.selectedSessionIds = [...sessionIds]
+      },
+      clearSessionSelection: (d) => {
+        d.selectedSessionIds = []
       },
     },
   })

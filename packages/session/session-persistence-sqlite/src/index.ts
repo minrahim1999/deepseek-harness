@@ -370,6 +370,25 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
     this.db.close()
   }
 
+  /**
+   * Permanently delete a persisted session and its event rows. The `events`
+   * table cascades on `sessions` delete (ON DELETE CASCADE), so removing the
+   * `sessions` row removes the whole log. Deleting an absent session is a
+   * no-op success. The caller must have detached the session from the live
+   * SessionStore first.
+   * @param id - the persisted session to delete.
+   * @param signal - optional cancellation for backend delete work.
+   * @returns whether a materialized session was actually removed.
+   */
+  override async delete(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    await this.ready
+    signal?.throwIfAborted()
+    const result = this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id)
+    signal?.throwIfAborted()
+    return result.changes > 0
+  }
+
   // --- row helpers ---
 
   /** Fetch a session's row, or undefined if absent. */

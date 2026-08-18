@@ -2398,6 +2398,43 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         return ok(request, { sessionId: childId })
       },
 
+      async delete(request) {
+        const { sessionId } = request.payload
+        // Refuse to delete a live/running session: its Agent owns the log.
+        const live = ctx.agents.get(sessionId)
+        if (live !== undefined) {
+          return err(request, {
+            code: 'session-busy',
+            message: `session \"${sessionId}\" is running; stop it before deleting`,
+            details: { sessionId },
+          })
+        }
+        const attached = ctx.sessions.get(sessionId)
+        if (attached !== undefined) {
+          return err(request, {
+            code: 'session-busy',
+            message: `session \"${sessionId}\" is attached to a live Agent; stop it before deleting`,
+            details: { sessionId },
+          })
+        }
+        // Detach the session from any workspace accounting so it no longer
+        // appears under a workspace after deletion.
+        const registry = ctx.get('workspaceRegistry')
+        if (registry !== undefined) {
+          for (const workspace of registry.list()) {
+            if (workspace.sessionIds.includes(sessionId)) {
+              await workspace.detachSession(sessionId)
+            }
+          }
+        }
+        // Remove the session from persistence (no-op if already absent).
+        const persistence = ctx.get('sessionPersistence')
+        if (persistence !== undefined) {
+          await persistence.delete(sessionId)
+        }
+        return ok(request, { deleted: true as const })
+      },
+
       async prompt(request) {
         const { sessionId, mode, content, clientTimeZone } = request.payload
         const canonicalTimeZone = clientTimeZone === undefined

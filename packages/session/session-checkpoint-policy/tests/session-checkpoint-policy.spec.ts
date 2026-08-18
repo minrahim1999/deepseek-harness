@@ -29,6 +29,7 @@ class TestPersistence extends SessionPersistence {
   }
   list(): Promise<SessionHeader[]> { return Promise.resolve([]) }
   listSnapshots(): Promise<never[]> { return Promise.resolve([]) }
+  async delete(_id: SessionId): Promise<boolean> { return false }
 }
 
 class RecordingAdapter extends LlmAdapter {
