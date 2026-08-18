@@ -12,8 +12,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCloseFill14, IconPersonalizationOutline16,
-  IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
+  Button, IconCloseFill14, IconCloseOutline16, IconPersonalizationOutline16,
+  IconProjectAddOutline16, IconSearchOutline16, IconTrashOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
@@ -255,6 +255,7 @@ type SessionTreeProps = Pick<
 function SessionTree({
   useSessions, startSession, open, forkSession, workspaces, archivedSessionIds,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive, onSessionDelete,
+  selectedSessionIds, onToggleSessionSelected,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
@@ -523,6 +524,8 @@ function SessionTree({
                     onFork={forkSession}
                     onArchive={onSessionArchive}
                     onDelete={onSessionDelete}
+                    bulkSelected={selectedSessionIds.includes(node.id)}
+                    onToggleSelected={onToggleSessionSelected}
                     drag={dragProps}
                     t={t}
                   />
@@ -1261,17 +1264,21 @@ export function WorkspaceBrowser({
             {t('bulk.selected', { n: selectedSessionIds.length })}
           </span>
           <Button
-            variant="outline"
+            variant="ghost"
+            size="sm"
+            icon={<IconTrashOutline16 />}
             className={css.deleteAction}
             onClick={openBulkDelete}
           >
             {t('bulk.delete')}
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
+            size="sm"
+            icon={<IconCloseOutline16 />}
             onClick={() => { actions.clearSessionSelection() }}
           >
-            {t('cancel')}
+            {t('bulk.clear')}
           </Button>
         </div>
       )}
@@ -1375,10 +1382,11 @@ export function WorkspaceBrowser({
         description={t('delete.session.desc')}
         footer={(
           <>
-            <Button variant="outline" disabled={sessionDeleting} onClick={closeSessionDelete}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={sessionDeleting} icon={<IconCloseOutline16 />} onClick={closeSessionDelete}>{t('cancel')}</Button>
             <Button
               variant="outline"
               className={css.deleteAction}
+              icon={<IconTrashOutline16 />}
               disabled={sessionDeleting}
               onClick={confirmSessionDelete}
             >
@@ -1398,10 +1406,11 @@ export function WorkspaceBrowser({
         description={t('bulk.delete.desc', { n: selectedSessionIds.length })}
         footer={(
           <>
-            <Button variant="outline" disabled={bulkDeleting} onClick={closeBulkDelete}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={bulkDeleting} icon={<IconCloseOutline16 />} onClick={closeBulkDelete}>{t('cancel')}</Button>
             <Button
               variant="outline"
               className={css.deleteAction}
+              icon={<IconTrashOutline16 />}
               disabled={bulkDeleting}
               onClick={confirmBulkDelete}
             >
